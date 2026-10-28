@@ -4,7 +4,9 @@ A React + TypeScript implementation of the refund flow for the ZUS Regional Seni
 
 ## Live demo
 
-> Deploy link will be added here after deployment.
+**[https://refund-flow-eta.vercel.app](https://refund-flow-eta.vercel.app)**
+
+- GitHub: [https://github.com/chenho1998/refund-flow](https://github.com/chenho1998/refund-flow)
 
 ## Stack
 
