@@ -262,15 +262,10 @@ export function useRefundFlow(
     state.selection.selectedUnitIds.size > 0 ||
     state.selection.includeDeliveryFee;
 
-  // True if the user has made any meaningful change — used to warn before closing
-  const isDirty =
-    hasValidSelection || state.reason !== "" || state.channel !== "";
-
   return {
     state,
     calculation,
     hasValidSelection,
-    isDirty,
     openRefund,
     closeRefund,
     reset,
