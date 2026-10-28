@@ -9,6 +9,7 @@ import type {
 import { calculateRefund } from "../domain/calculation";
 import { submitRefund } from "../api/mockApi";
 import { rawOrderToOrder } from "../data/order";
+import { isUnitEligible, isDeliveryFeeEligible } from "../domain/eligibility";
 import type { SubmitRefundRequest } from "../api/types";
 
 export type RefundStep = 1 | 2;
@@ -24,11 +25,11 @@ export interface RefundFlowState {
   isConfirmOpen: boolean;
 }
 
-const EMPTY_SELECTION: RefundSelection = {
+const makeEmptySelection = (): RefundSelection => ({
   selectedUnitIds: new Set(),
   addonSelections: new Map(),
   includeDeliveryFee: false,
-};
+});
 
 export function useRefundFlow(
   order: Order,
@@ -37,7 +38,7 @@ export function useRefundFlow(
   const [state, setState] = useState<RefundFlowState>({
     isOpen: false,
     step: 1,
-    selection: EMPTY_SELECTION,
+    selection: makeEmptySelection(),
     reason: "",
     channel: "",
     isSubmitting: false,
@@ -51,11 +52,7 @@ export function useRefundFlow(
     setState({
       isOpen: true,
       step: 1,
-      selection: {
-        ...EMPTY_SELECTION,
-        selectedUnitIds: new Set(),
-        addonSelections: new Map(),
-      },
+      selection: makeEmptySelection(),
       reason: "",
       channel: "",
       isSubmitting: false,
@@ -109,7 +106,6 @@ export function useRefundFlow(
     (unitId: string, addonId: string, eligible: boolean) => {
       if (!eligible) return;
       setState((s) => {
-        // Add-on can only be toggled if unit is selected
         if (!s.selection.selectedUnitIds.has(unitId)) return s;
 
         const nextAddons = new Map(s.selection.addonSelections);
@@ -138,6 +134,40 @@ export function useRefundFlow(
     }));
   }, []);
 
+  /** Select all eligible units (with all their eligible add-ons) and delivery fee. */
+  const selectAll = useCallback(() => {
+    const selectedUnitIds = new Set<string>();
+    const addonSelections = new Map<string, Set<string>>();
+
+    for (const unit of order.units) {
+      if (!isUnitEligible(unit)) continue;
+      selectedUnitIds.add(unit.unitId);
+
+      const eligibleAddons = unit.addons
+        .filter((a) => a.status === "paid")
+        .map((a) => a.addonId);
+
+      if (eligibleAddons.length > 0) {
+        addonSelections.set(unit.unitId, new Set(eligibleAddons));
+      }
+    }
+
+    const includeDeliveryFee = isDeliveryFeeEligible(order);
+
+    setState((s) => ({
+      ...s,
+      selection: { selectedUnitIds, addonSelections, includeDeliveryFee },
+    }));
+  }, [order]);
+
+  /** Clear all selections. */
+  const clearAll = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      selection: makeEmptySelection(),
+    }));
+  }, []);
+
   // ─── Review fields ─────────────────────────────────────────────────────────
 
   const setReason = useCallback((reason: RefundReason) => {
@@ -155,7 +185,7 @@ export function useRefundFlow(
   }, []);
 
   const closeConfirm = useCallback(() => {
-    // Closes only the confirm dialog; refund modal stays open
+    // Closes only the confirm dialog; refund modal stays open with selections preserved
     setState((s) => ({ ...s, isConfirmOpen: false }));
   }, []);
 
@@ -218,10 +248,15 @@ export function useRefundFlow(
     state.selection.selectedUnitIds.size > 0 ||
     state.selection.includeDeliveryFee;
 
+  // True if the user has made any meaningful change — used to warn before closing
+  const isDirty =
+    hasValidSelection || state.reason !== "" || state.channel !== "";
+
   return {
     state,
     calculation,
     hasValidSelection,
+    isDirty,
     openRefund,
     closeRefund,
     goToStep2,
@@ -229,6 +264,8 @@ export function useRefundFlow(
     toggleUnit,
     toggleAddon,
     setDeliveryFee,
+    selectAll,
+    clearAll,
     setReason,
     setChannel,
     openConfirm,
