@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import * as Select from '@radix-ui/react-select'
 import { ChevronDownIcon, ChevronUpIcon, CheckIcon } from '@radix-ui/react-icons'
 import type { Order, RefundCalculation } from '../../domain/types'
@@ -112,12 +112,18 @@ export function Step2Review({
   onConfirm,
 }: Step2ReviewProps) {
   const canConfirm = state.reason !== '' && state.channel !== ''
-  // Only highlight missing fields after the user has tried to confirm once
   const [attempted, setAttempted] = useState(false)
+
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const reasonRef = useRef<HTMLDivElement>(null)
+  const channelRef = useRef<HTMLDivElement>(null)
 
   function handleConfirmClick() {
     if (!canConfirm) {
       setAttempted(true)
+      // Scroll to the first missing field
+      const target = state.reason === '' ? reasonRef.current : channelRef.current
+      target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       return
     }
     onConfirm()
@@ -128,7 +134,7 @@ export function Step2Review({
 
   return (
     <div className="flex flex-col">
-      <div className="space-y-4 overflow-y-auto px-6 pt-2 pb-4" style={{ maxHeight: '55vh' }}>
+      <div ref={scrollRef} className="space-y-4 overflow-y-auto px-6 pt-2 pb-4" style={{ maxHeight: '55vh' }}>
 
         {/* Selected items preview */}
         <section aria-label="Items to be refunded">
@@ -189,26 +195,30 @@ export function Step2Review({
         </div>
 
         {/* Reason */}
-        <StyledSelect
-          id="refund-reason"
-          label="Reason"
-          placeholder="Select a reason"
-          value={state.reason as RefundReason | ''}
-          options={REFUND_REASONS}
-          onChange={onSetReason}
-          missing={attempted && state.reason === ''}
-        />
+        <div ref={reasonRef}>
+          <StyledSelect
+            id="refund-reason"
+            label="Reason"
+            placeholder="Select a reason"
+            value={state.reason as RefundReason | ''}
+            options={REFUND_REASONS}
+            onChange={onSetReason}
+            missing={attempted && state.reason === ''}
+          />
+        </div>
 
         {/* Channel */}
-        <StyledSelect
-          id="refund-channel"
-          label="Refund channel"
-          placeholder="Select refund channel"
-          value={state.channel as RefundChannel | ''}
-          options={REFUND_CHANNELS}
-          onChange={onSetChannel}
-          missing={attempted && state.channel === ''}
-        />
+        <div ref={channelRef}>
+          <StyledSelect
+            id="refund-channel"
+            label="Refund channel"
+            placeholder="Select refund channel"
+            value={state.channel as RefundChannel | ''}
+            options={REFUND_CHANNELS}
+            onChange={onSetChannel}
+            missing={attempted && state.channel === ''}
+          />
+        </div>
 
         {/* Hint shown only after a failed confirm attempt */}
         {attempted && !canConfirm && (

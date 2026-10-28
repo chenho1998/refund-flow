@@ -1,4 +1,3 @@
-import * as Checkbox from '@radix-ui/react-checkbox'
 import { CheckIcon } from '@radix-ui/react-icons'
 import type { Order } from '../../domain/types'
 import type { RefundFlowState } from '../../hooks/useRefundFlow'
@@ -21,35 +20,32 @@ interface Step1SelectProps {
   onClose: () => void
 }
 
+/**
+ * Purely visual checkbox — no interactive events of its own.
+ * The parent <button> owns the entire row's click/keyboard handling.
+ * We stop propagation here so clicks on the visual checkbox don't
+ * bubble up and fire the parent button a second time (double-toggle bug).
+ */
 function StyledCheckbox({
-  id,
   checked,
-  onCheckedChange,
   disabled,
-  label,
 }: {
-  id: string
   checked: boolean
-  onCheckedChange: () => void
   disabled: boolean
-  label: string
+  label: string  // kept in interface for call-site clarity; visual-only so not rendered
 }) {
   return (
-    <Checkbox.Root
-      id={id}
-      checked={checked}
-      onCheckedChange={onCheckedChange}
-      disabled={disabled}
-      className="flex h-4 w-4 shrink-0 items-center justify-center rounded border border-gray-300
-        bg-white data-[state=checked]:border-red-600 data-[state=checked]:bg-red-600
-        focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-500 focus-visible:ring-offset-1
-        disabled:cursor-not-allowed disabled:opacity-40"
-      aria-label={label}
+    <div
+      role="presentation"
+      aria-hidden="true"
+      onClick={(e) => e.stopPropagation()}
+      className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors
+        ${checked ? 'border-red-600 bg-red-600' : 'border-gray-300 bg-white'}
+        ${disabled ? 'opacity-40' : ''}
+      `}
     >
-      <Checkbox.Indicator>
-        <CheckIcon className="h-3 w-3 text-white" />
-      </Checkbox.Indicator>
-    </Checkbox.Root>
+      {checked && <CheckIcon className="h-3 w-3 text-white" />}
+    </div>
   )
 }
 
@@ -131,10 +127,10 @@ export function Step1Select({
                 role="group"
                 aria-label={`${line.lineName}${line.units.length > 1 ? ` #${unitIdx + 1}` : ''}`}
                 className={`rounded-lg border transition-colors ${!eligible
-                    ? 'border-gray-100 bg-gray-50 opacity-60'
-                    : unitSelected
-                      ? 'border-red-200 bg-red-50'
-                      : 'border-gray-200 bg-white hover:border-gray-300'
+                  ? 'border-gray-100 bg-gray-50 opacity-60'
+                  : unitSelected
+                    ? 'border-red-200 bg-red-50'
+                    : 'border-gray-200 bg-white hover:border-gray-300'
                   }`}
               >
                 {/* Clickable unit row — full width */}
@@ -146,9 +142,7 @@ export function Step1Select({
                   aria-pressed={unitSelected}
                 >
                   <StyledCheckbox
-                    id={`unit-${unit.unitId}`}
                     checked={unitSelected}
-                    onCheckedChange={() => onToggleUnit(unit.unitId, eligible)}
                     disabled={!eligible}
                     label={`Select ${line.lineName}${line.units.length > 1 ? ` #${unitIdx + 1}` : ''} for refund`}
                   />
@@ -198,9 +192,7 @@ export function Step1Select({
                             aria-pressed={addonChecked}
                           >
                             <StyledCheckbox
-                              id={`addon-${unit.unitId}-${addon.addonId}`}
                               checked={addonChecked}
-                              onCheckedChange={() => onToggleAddon(unit.unitId, addon.addonId, addonEnabled)}
                               disabled={!addonEnabled}
                               label={`Select add-on ${addon.name}`}
                             />
@@ -229,10 +221,10 @@ export function Step1Select({
         {order.deliveryFeeSen > 0 && (
           <div
             className={`rounded-lg border transition-colors ${!deliveryEligible
-                ? 'border-gray-100 bg-gray-50 opacity-60'
-                : state.selection.includeDeliveryFee
-                  ? 'border-red-200 bg-red-50'
-                  : 'border-gray-200 bg-white hover:border-gray-300'
+              ? 'border-gray-100 bg-gray-50 opacity-60'
+              : state.selection.includeDeliveryFee
+                ? 'border-red-200 bg-red-50'
+                : 'border-gray-200 bg-white hover:border-gray-300'
               }`}
           >
             <button
@@ -243,9 +235,7 @@ export function Step1Select({
               aria-pressed={state.selection.includeDeliveryFee}
             >
               <StyledCheckbox
-                id="delivery-fee"
                 checked={state.selection.includeDeliveryFee}
-                onCheckedChange={() => onSetDeliveryFee(!state.selection.includeDeliveryFee)}
                 disabled={!deliveryEligible}
                 label="Include delivery fee in refund"
               />
