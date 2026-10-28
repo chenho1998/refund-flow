@@ -63,10 +63,10 @@ function StyledSelect<T extends string>({
         <Select.Trigger
           id={id}
           className={`flex w-full items-center justify-between rounded-md border px-3 py-2 text-sm
-            shadow-sm bg-white hover:border-gray-400
+            bg-white hover:border-gray-400
             focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-1
             data-[placeholder]:text-gray-400
-            ${missing ? 'border-red-300 ring-1 ring-red-300' : 'border-gray-300 text-gray-700'}`}
+            ${missing ? 'border-red-300 ring-1 ring-red-300 text-gray-700' : 'border-gray-300 text-gray-700 shadow-sm'}`}
           aria-label={label}
           aria-invalid={missing}
         >

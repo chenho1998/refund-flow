@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import * as Dialog from '@radix-ui/react-dialog'
 import * as AlertDialog from '@radix-ui/react-alert-dialog'
 import { Cross2Icon } from '@radix-ui/react-icons'
@@ -25,15 +25,23 @@ export function RefundModal({ order, open, onOpenChange, onSuccess }: RefundModa
   const [showCloseGuard, setShowCloseGuard] = useState(false)
 
   const flow = useRefundFlow(order, (updatedOrder) => {
+    // Success: close everything directly — no guard needed
     onSuccess(updatedOrder)
     onOpenChange(false)
   })
 
-  // Called whenever something tries to close the main modal (X button, Escape, overlay click)
+  // Reset flow state back to step 1 every time the modal opens
+  useEffect(() => {
+    if (open) {
+      flow.reset()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open])
+
+  // Called when user tries to close mid-flow (X, Escape, backdrop)
   function requestClose() {
     if (flow.state.isSubmitting) return
     if (flow.isDirty) {
-      // Has unsaved selections — ask for confirmation before discarding
       setShowCloseGuard(true)
     } else {
       onOpenChange(false)

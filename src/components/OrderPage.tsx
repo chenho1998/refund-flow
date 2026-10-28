@@ -115,9 +115,6 @@ export function OrderPage() {
             >
               Refund
             </Button>
-            {!canRefund && (
-              <p className="text-xs text-gray-400">Nothing left to refund</p>
-            )}
           </div>
         </div>
 

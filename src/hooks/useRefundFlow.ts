@@ -61,6 +61,20 @@ export function useRefundFlow(
     });
   }, []);
 
+  // Resets all state back to the initial step 1 — called when the modal re-opens
+  const reset = useCallback(() => {
+    setState({
+      isOpen: false,
+      step: 1,
+      selection: makeEmptySelection(),
+      reason: "",
+      channel: "",
+      isSubmitting: false,
+      submitError: null,
+      isConfirmOpen: false,
+    });
+  }, []);
+
   const closeRefund = useCallback(() => {
     setState((s) => ({ ...s, isOpen: false, isConfirmOpen: false }));
   }, []);
@@ -259,6 +273,7 @@ export function useRefundFlow(
     isDirty,
     openRefund,
     closeRefund,
+    reset,
     goToStep2,
     goToStep1,
     toggleUnit,
