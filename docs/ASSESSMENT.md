@@ -11,25 +11,31 @@ This flow needs two endpoints.
 Fetches the current order state, including updated refund statuses after a refund is processed.
 
 **Response `200 OK`:**
+
 ```json
 {
   "order": {
     "order_id": "ORD-10482",
     "status": "completed",
     "currency": "MYR",
-    "delivery_fee": 5.00,
+    "delivery_fee": 5.0,
     "delivery_fee_status": "paid",
     "items": [
       {
         "line_id": "L1",
         "name": "Iced Spanish Latte",
-        "unit_price": 13.90,
+        "unit_price": 13.9,
         "units": [
           {
             "unit_id": "L1-1",
             "status": "refunded",
             "addons": [
-              { "addon_id": "A1", "name": "Extra Shot", "unit_price": 2.00, "status": "refunded" }
+              {
+                "addon_id": "A1",
+                "name": "Extra Shot",
+                "unit_price": 2.0,
+                "status": "refunded"
+              }
             ]
           }
         ]
@@ -48,6 +54,7 @@ Fetches the current order state, including updated refund statuses after a refun
 Submits a refund request.
 
 **Request body:**
+
 ```json
 {
   "idempotencyKey": "uuid-v4",
@@ -63,16 +70,20 @@ Submits a refund request.
 ```
 
 **Response `200 OK` (success):**
+
 ```json
 {
   "success": true,
   "refundId": "uuid-v4",
   "amountSen": 2930,
-  "updatedOrder": { /* full order object */ }
+  "updatedOrder": {
+    /* full order object */
+  }
 }
 ```
 
 **Response `200 OK` (failure):**
+
 ```json
 {
   "success": false,
@@ -107,9 +118,11 @@ Possible error codes: `DUPLICATE_REQUEST`, `UNIT_ALREADY_REFUNDED`, `INVALID_SEL
 
 5. **"Staff" vs. "customer" context.** The back office is staff-facing, so I optimized for clarity and information density rather than customer-friendly tone.
 
-6. **No confirmation of refund amount on the order page.** After a successful refund, the order page shows updated statuses. There is no success toast or email trigger — both were out of scope. **Q: Should a success notification be shown?**
+6. **Success feedback on the order page.** After a successful refund, a timestamped green banner appears at the top of the order page and item statuses update immediately. There is no email or push notification trigger — both are assumed to be handled by a separate backend service.
 
 7. **All add-ons per unit share the same product `addon_id` (e.g. A1, A2, A3) across units.** I scope add-on selections by `unitId + addonId` to avoid cross-unit contamination.
+
+8. **Close / discard guard.** Closing the refund modal (via the X button, Escape key, or clicking the backdrop) while selections or review details have been entered shows a confirmation dialog before discarding. If nothing has been touched, it closes immediately without interruption.
 
 ---
 
@@ -119,7 +132,7 @@ Possible error codes: `DUPLICATE_REQUEST`, `UNIT_ALREADY_REFUNDED`, `INVALID_SEL
 Floating-point arithmetic on currency is unreliable. Storing all values as integers (sen) and converting only at the display boundary eliminates rounding bugs. The trade-off is that the ingestion layer must convert, but this is a single, tested boundary.
 
 **Flat unit model**
-The domain model flattens `items[].units[]` into a single `units[]` array. This makes iteration, selection, and calculation uniform — no nested loops anywhere in the business logic. The original line grouping is only reconstructed for display.
+The domain model flattens `items[].units[]` into a single `units[]` array. This makes iteration, selection, and calculation uniform — no nested loops anywhere in the business logic. The original line grouping is only reconstructed for display in the order page and the selection modal.
 
 **Pure calculation function**
 `calculateRefund()` is a plain function with no side effects: `(Order, RefundSelection) → RefundCalculation`. This makes it independently testable and also usable by the mock API for server-side verification. The same function covers both the live preview and the server-side amount validation.
@@ -128,32 +141,43 @@ The domain model flattens `items[].units[]` into a single `units[]` array. This 
 Even in a mock, the API recalculates the amount from the selection. This is the correct production pattern — it prevents a tampered client from inflating a refund.
 
 **Radix UI for accessible dialogs**
-Radix primitives provide correct ARIA roles, focus trapping, keyboard dismissal, and screen reader announcements out of the box. This avoids reimplementing accessible dialog behavior from scratch.
+Radix primitives provide correct ARIA roles, focus trapping, keyboard dismissal, and screen reader announcements out of the box. This avoids reimplementing accessible dialog behavior from scratch. Three separate Radix Dialog/AlertDialog instances are used: the main refund modal, the confirmation dialog (Step 3), and the discard guard — each with independent open/close state so they can appear and close independently.
 
 **useRefundFlow hook**
-All flow state (step, selection, submission status) is colocated in one hook. Components receive only what they need via props. This keeps components focused on presentation and the hook responsible for business logic orchestration.
+All flow state (step, selection, submission status, dirty flag) is colocated in one hook. Components receive only what they need via props. This keeps components focused on presentation and the hook responsible for business logic orchestration.
 
 **Add-on auto-deselect on unit deselect**
-When a unit is unchecked, all its add-on selections are cleared. This enforces the rule that add-ons cannot be refunded without their parent unit, and prevents ghost selections from accidentally resurfacing.
+When a unit is unchecked, all its add-on selections are cleared. This enforces the rule that add-ons cannot be refunded without their parent unit, and prevents ghost selections from accidentally resurfacing if the unit is re-checked later.
+
+**"Select all" shortcut**
+A full refund (all eligible items) is the most common staff action. Rather than requiring staff to tick every row individually, a single "Select all" link at the top of the selection list selects all eligible units, their eligible add-ons, and the delivery fee in one action. "Clear" reverses it. The counter ("3 of 5 selected") gives continuous feedback on coverage.
+
+**Step 2 field validation UX**
+The Confirm button is never disabled. Instead, clicking it with missing fields highlights the empty selects in red and shows inline "required" labels. This is more informative than a silently greyed-out button — staff know exactly what's missing rather than trying to guess why the button won't respond.
+
+**Clickable full-width rows in Step 1**
+The entire item card is a clickable button, not just the checkbox. This matches natural pointing behaviour — staff click the row, not a 16px target.
 
 ---
 
 ## e) Known Limitations & Next Steps
 
 **Not handled yet:**
+
 - No real backend. The mock API lives in the browser and resets on page reload.
-- No authentication or authorization. In production, the endpoint must verify the staff member's identity and permissions.
-- No optimistic UI updates. The order page reloads its state only after a confirmed API success.
-- No pagination or search. The order page shows a single hard-coded order.
-- No accessibility audit. The keyboard flow and ARIA markup are implemented correctly by construction (Radix) but have not been tested with a screen reader.
+- No authentication or authorization. In production, the endpoint must verify the staff member's identity and permissions before allowing a refund.
+- No optimistic UI updates. The order page reflects the new state only after a confirmed API success response.
+- No pagination or order search. The page shows a single hard-coded order.
+- No accessibility audit with assistive technology. The keyboard flow and ARIA markup are implemented correctly by construction (Radix) but have not been tested with VoiceOver or NVDA.
 - No error boundary. An uncaught render error would crash the entire page.
-- The mock failure rate (20%) can produce failures during demos; it can be lowered via `setMockFailureRate(0)` but there is no UI control for it.
+- The mock failure rate (20%) can produce failures during demos. It can be lowered via `setMockFailureRate(0)` in the source but there is no runtime UI control for it.
 
 **Next steps with more time:**
-1. Replace the mock API with a real HTTP client (e.g. `fetch` with a typed wrapper or React Query).
-2. Add an error boundary around the order page.
-3. Add an end-to-end test with Playwright covering the happy path and the failure/retry path.
-4. Add a success toast after a completed refund.
-5. Consider optimistic updates so the UI reflects the refund immediately, with a rollback on error.
-6. Audit with VoiceOver / NVDA to verify the modal and checkbox flows are fully accessible.
-7. Add rate limiting and proper auth headers to the real API layer.
+
+1. Replace the mock API with a real HTTP client (e.g. `fetch` with a typed wrapper, or React Query / TanStack Query for caching and background refetches).
+2. Add a React error boundary around the order page so a render failure shows a recovery UI rather than a blank screen.
+3. Add end-to-end tests with Playwright covering: happy path full refund, partial refund, failure + retry, cancel mid-flow (discard guard), and the "all items already refunded" state.
+4. Audit with VoiceOver / NVDA to verify that the modal, checkbox, and select flows are fully operable by screen reader users.
+5. Consider optimistic updates — mark items as pending immediately on submit, roll back on error.
+6. Add rate limiting and proper auth headers (e.g. Bearer token, CSRF) to the real API layer.
+7. Persist draft selection to `sessionStorage` so a page refresh mid-flow doesn't silently discard work.
