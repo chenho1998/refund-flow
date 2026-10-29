@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
 import type {
   Order,
@@ -9,7 +9,11 @@ import type {
 import { calculateRefund } from "../domain/calculation";
 import { submitRefund } from "../api/mockApi";
 import { rawOrderToOrder } from "../data/order";
-import { isUnitEligible, isDeliveryFeeEligible } from "../domain/eligibility";
+import {
+  isUnitEligible,
+  isAddonEligible,
+  isDeliveryFeeEligible,
+} from "../domain/eligibility";
 import type { SubmitRefundRequest } from "../api/types";
 
 export type RefundStep = 1 | 2;
@@ -46,6 +50,22 @@ export function useRefundFlow(
     isConfirmOpen: false,
   });
 
+  /**
+   * Synchronous in-flight guard (P1).
+   * useRef so it updates instantly — unlike setState which is async.
+   * Prevents two rapid clicks from both starting a submission before
+   * the first render with isSubmitting:true has committed.
+   */
+  const inFlightRef = useRef(false);
+
+  /**
+   * Idempotency key (P1).
+   * Generated once when the confirm dialog opens, reused on every retry
+   * of the same logical refund. A new key is only generated for a new
+   * logical refund (i.e. when the confirm dialog re-opens after reset).
+   */
+  const idempotencyKeyRef = useRef<string>("");
+
   // ─── Open / close ──────────────────────────────────────────────────────────
 
   const openRefund = useCallback(() => {
@@ -61,8 +81,10 @@ export function useRefundFlow(
     });
   }, []);
 
-  // Resets all state back to the initial step 1 — called when the modal re-opens
+  /** Resets all state back to step 1 — called when the modal re-opens. */
   const reset = useCallback(() => {
+    inFlightRef.current = false;
+    idempotencyKeyRef.current = "";
     setState({
       isOpen: false,
       step: 1,
@@ -99,7 +121,6 @@ export function useRefundFlow(
 
       if (next.has(unitId)) {
         next.delete(unitId);
-        // Deselect all add-ons for this unit when unit is deselected
         nextAddons.delete(unitId);
       } else {
         next.add(unitId);
@@ -148,7 +169,11 @@ export function useRefundFlow(
     }));
   }, []);
 
-  /** Select all eligible units (with all their eligible add-ons) and delivery fee. */
+  /**
+   * Select all eligible units with all their eligible add-ons, and the
+   * delivery fee. Uses shared eligibility helpers (not raw status checks)
+   * so the rule stays in one place.
+   */
   const selectAll = useCallback(() => {
     const selectedUnitIds = new Set<string>();
     const addonSelections = new Map<string, Set<string>>();
@@ -157,12 +182,12 @@ export function useRefundFlow(
       if (!isUnitEligible(unit)) continue;
       selectedUnitIds.add(unit.unitId);
 
-      const eligibleAddons = unit.addons
-        .filter((a) => a.status === "paid")
-        .map((a) => a.addonId);
+      const eligibleAddonIds = unit.addons
+        .filter((addon) => isAddonEligible(addon, unit))
+        .map((addon) => addon.addonId);
 
-      if (eligibleAddons.length > 0) {
-        addonSelections.set(unit.unitId, new Set(eligibleAddons));
+      if (eligibleAddonIds.length > 0) {
+        addonSelections.set(unit.unitId, new Set(eligibleAddonIds));
       }
     }
 
@@ -176,10 +201,7 @@ export function useRefundFlow(
 
   /** Clear all selections. */
   const clearAll = useCallback(() => {
-    setState((s) => ({
-      ...s,
-      selection: makeEmptySelection(),
-    }));
+    setState((s) => ({ ...s, selection: makeEmptySelection() }));
   }, []);
 
   // ─── Review fields ─────────────────────────────────────────────────────────
@@ -195,11 +217,16 @@ export function useRefundFlow(
   // ─── Confirm dialog ────────────────────────────────────────────────────────
 
   const openConfirm = useCallback(() => {
+    // Generate the idempotency key exactly once per logical refund operation.
+    // If the key is already set (retry after error), reuse it so the server
+    // can detect and return the original committed result.
+    if (!idempotencyKeyRef.current) {
+      idempotencyKeyRef.current = uuidv4();
+    }
     setState((s) => ({ ...s, isConfirmOpen: true, submitError: null }));
   }, []);
 
   const closeConfirm = useCallback(() => {
-    // Closes only the confirm dialog; refund modal stays open with selections preserved
     setState((s) => ({ ...s, isConfirmOpen: false }));
   }, []);
 
@@ -209,10 +236,12 @@ export function useRefundFlow(
     const { selection, reason, channel } = state;
     if (!reason || !channel) return;
 
-    const idempotencyKey = uuidv4();
+    // Synchronous in-flight guard — prevents double-submission from rapid clicks
+    if (inFlightRef.current) return;
+    inFlightRef.current = true;
 
     const request: SubmitRefundRequest = {
-      idempotencyKey,
+      idempotencyKey: idempotencyKeyRef.current,
       selectedUnitIds: Array.from(selection.selectedUnitIds),
       addonSelections: Object.fromEntries(
         Array.from(selection.addonSelections.entries()).map(([k, v]) => [
@@ -240,6 +269,7 @@ export function useRefundFlow(
         }));
         onSuccess(updatedOrder);
       } else {
+        // API returned a typed failure — preserve state so staff can retry
         setState((s) => ({
           ...s,
           isSubmitting: false,
@@ -247,11 +277,15 @@ export function useRefundFlow(
         }));
       }
     } catch {
+      // Unexpected network / runtime error
       setState((s) => ({
         ...s,
         isSubmitting: false,
         submitError: "An unexpected error occurred. Please try again.",
       }));
+    } finally {
+      // Always release the in-flight guard, even on unexpected throws
+      inFlightRef.current = false;
     }
   }, [state, order.orderId, onSuccess]);
 
