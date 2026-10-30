@@ -73,13 +73,13 @@ export async function submitRefund(
   await simulateLatency();
 
   // 1. Random failure simulation
-  if (Math.random() < MOCK_FAILURE_RATE) {
-    return {
-      success: false,
-      code: "INTERNAL_ERROR",
-      message: "A temporary server error occurred. Please try again.",
-    };
-  }
+  // if (Math.random() < MOCK_FAILURE_RATE) {
+  //   return {
+  //     success: false,
+  //     code: "INTERNAL_ERROR",
+  //     message: "A temporary server error occurred. Please try again.",
+  //   };
+  // }
 
   // 2. Order ID sanity check
   if (currentOrder.order_id !== orderId) {

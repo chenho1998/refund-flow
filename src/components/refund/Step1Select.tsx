@@ -38,7 +38,7 @@ function StyledCheckbox({
     <div
       role="presentation"
       aria-hidden="true"
-      onClick={(e) => e.stopPropagation()}
+      // onClick={(e) => e.stopPropagation()}
       className={`flex h-4 w-4 shrink-0 items-center justify-center rounded border transition-colors
         ${checked ? 'border-red-600 bg-red-600' : 'border-gray-300 bg-white'}
         ${disabled ? 'opacity-40' : ''}

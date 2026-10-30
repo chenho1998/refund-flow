@@ -26,10 +26,10 @@ export function RefundModal({ order, open, onOpenChange, onSuccess }: RefundModa
   })
 
   // Reset flow state back to step 1 every time the modal opens
-  useEffect(() => {
-    if (open) flow.reset()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open])
+  // useEffect(() => {
+  //   if (open) flow.reset()
+  //   // eslint-disable-next-line react-hooks/exhaustive-deps
+  // }, [open])
 
   function handleClose() {
     if (flow.state.isSubmitting) return

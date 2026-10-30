@@ -114,15 +114,11 @@ Possible error codes: `DUPLICATE_REQUEST`, `UNIT_ALREADY_REFUNDED`, `INVALID_SEL
 
 3. **No partial unit refund.** Each unit is either refunded in full (including all selected add-ons) or not at all. There is no concept of "refund 50% of a unit." I assumed this is correct.
 
-4. **Idempotency key is client-generated.** A UUID is generated per submission attempt. If the network times out and the staff retries, a new key is generated so the retry is treated as a fresh request — which is safe because the server will also reject duplicate submissions via the idempotency store. **Q: Should a timed-out submission be retried with the same key (exactly-once), or is generating a new key on retry acceptable?**
+4. **"Staff" vs. "customer" context.** The back office is staff-facing, so I optimized for clarity and information density rather than customer-friendly tone.
 
-5. **"Staff" vs. "customer" context.** The back office is staff-facing, so I optimized for clarity and information density rather than customer-friendly tone.
+5. **Success feedback on the order page.** After a successful refund, a timestamped green banner appears at the top of the order page and item statuses update immediately. There is no email or push notification trigger — both are assumed to be handled by a separate backend service.
 
-6. **Success feedback on the order page.** After a successful refund, a timestamped green banner appears at the top of the order page and item statuses update immediately. There is no email or push notification trigger — both are assumed to be handled by a separate backend service.
-
-7. **All add-ons per unit share the same product `addon_id` (e.g. A1, A2, A3) across units.** I scope add-on selections by `unitId + addonId` to avoid cross-unit contamination.
-
-8. **Close / discard guard.** Closing the refund modal (via the X button, Escape key, or clicking the backdrop) while selections or review details have been entered shows a confirmation dialog before discarding. If nothing has been touched, it closes immediately without interruption.
+6. **Close / discard guard.** Closing the refund modal (via the X button, Escape key, or clicking the backdrop) while selections or review details have been entered shows a confirmation dialog before discarding. If nothing has been touched, it closes immediately without interruption.
 
 ---
 

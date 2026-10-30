@@ -268,6 +268,7 @@ export function useRefundFlow(
           isConfirmOpen: false,
         }));
         onSuccess(updatedOrder);
+        reset();
       } else {
         // API returned a typed failure — preserve state so staff can retry
         setState((s) => ({

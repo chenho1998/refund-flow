@@ -70,7 +70,7 @@ export function OrderPage() {
       <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6 lg:px-8">
 
         {/* ── Success banner ─────────────────────────────────────────── */}
-        {lastRefundedAt && (
+        {/* {lastRefundedAt && (
           <div
             role="status"
             aria-live="polite"
@@ -86,7 +86,7 @@ export function OrderPage() {
               </p>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* ── Header ────────────────────────────────────────────────── */}
         <div className="mb-5 flex items-start justify-between gap-4">
