@@ -49,12 +49,12 @@ function getOrderSummary(order: Order) {
 export function OrderPage() {
   const [order, setOrder] = useState<Order>(INITIAL_ORDER)
   const [refundModalOpen, setRefundModalOpen] = useState(false)
-  const [lastRefundedAt, setLastRefundedAt] = useState<Date | null>(null)
+  // const [lastRefundedAt, setLastRefundedAt] = useState<Date | null>(null)
 
   const handleRefundSuccess = useCallback((updatedOrder: Order) => {
     setOrder(updatedOrder)
     setRefundModalOpen(false)
-    setLastRefundedAt(new Date())
+    // setLastRefundedAt(new Date())
   }, [])
 
   const lines = groupUnitsByLine(order)
